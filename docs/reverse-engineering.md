@@ -1,6 +1,8 @@
+> 历史研究记录：本文描述早期原型及当时的验证结论；当前 0.7.0 实现与验证范围以根目录 README 和 android/ 下文档为准。
+
 # 逆向过程记录（APK 静态分析）
 
-> 时间：2026-02 · 对象：`G:\耳机重构\base.apk`（RoseLink，包名 `cn.ikaile.ruoshui.client`）
+> 时间：2026-02 · 对象：`base.apk`（RoseLink，包名 `cn.ikaile.ruoshui.client`）
 > 结论先行：RoseLink 是 **Flutter 应用**，BLE 协议逻辑在 `libapp.so`（Dart AOT）中；锆势属 **rs_common_v2 协议族**。
 
 ## 1. APK 结构

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+<LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:baselineAligned="false">
+<LinearLayout android:id="@+id/mode_anc" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_anc" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_anc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:id="@+id/mode_wind" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_wind" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_wind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:id="@+id/mode_transparency" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_transparency" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_transparency" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:id="@+id/mode_normal" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_normal" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_normal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+</LinearLayout>
+</LinearLayout>

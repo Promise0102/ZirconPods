@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+<TextView android:id="@+id/notification_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:maxLines="2" android:ellipsize="end" android:paddingBottom="4dp" />
+<LinearLayout android:layout_width="match_parent" android:layout_height="80dp" android:orientation="horizontal" android:baselineAligned="false">
+<LinearLayout android:id="@+id/mode_anc" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_anc" android:layout_width="48dp" android:layout_height="48dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_anc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="13sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:id="@+id/mode_wind" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_wind" android:layout_width="48dp" android:layout_height="48dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_wind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="13sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:id="@+id/mode_transparency" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_transparency" android:layout_width="48dp" android:layout_height="48dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_transparency" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="13sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+<LinearLayout android:id="@+id/mode_normal" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+<ImageView android:id="@+id/icon_normal" android:layout_width="48dp" android:layout_height="48dp" android:importantForAccessibility="no" />
+<TextView android:id="@+id/label_normal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="13sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
+</LinearLayout>
+</LinearLayout>
+<TextView android:id="@+id/notification_disconnect" android:layout_width="match_parent" android:layout_height="40dp" android:gravity="end|center_vertical" android:text="断开连接" android:textSize="12sp" android:clickable="true" android:focusable="true" android:contentDescription="断开耳机控制连接并关闭通知" />
+</LinearLayout>

@@ -1,20 +1,18 @@
-# 构建产物
-android/app/build/
-android/build/
-android/.gradle/
-android/local.properties
+**/build/
+**/.gradle/
+**/.kotlin/
+**/.idea/
+**/.build/
+**/local.properties
+**/.local/
+**/dist/
+**/.env
+**/.env.*
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
 *.apk
-
-# IDE
-.idea/
-*.iml
-.vscode/
-
-# 系统
-.DS_Store
-Thumbs.db
-
-# 临时/逆向分析产物（不入库）
-tmp/
-*.zip
-*.png
+*.aab
+*.hprof

@@ -1,73 +1,38 @@
 plugins {
-    alias(libs.plugins.agp.app)
-    alias(libs.plugins.kotlin.compose)
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
-
 android {
-    namespace = "com.zirconpods"
-    compileSdk = 37
-
-    defaultConfig {
-        applicationId = "com.zirconpods"
-        minSdk = 26
-        targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+    namespace = "local.roselink.lite"
+    compileSdk = 34
+    defaultConfig { applicationId = "local.roselink.lite"; minSdk = 26; targetSdk = 34; versionCode = 7; versionName = "0.7.0" }
+    buildFeatures { compose = true }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
+    kotlinOptions { jvmTarget = "1.8" }
+    signingConfigs {
+        create("local") {
+            val password = rootProject.file(".local/signing-password.txt")
+            val key = rootProject.file(".local/local-test.p12")
+            if (password.exists() && key.exists()) {
+                storeFile = key; storePassword = password.readText().trim()
+                keyAlias = "roselink-lite-local"; keyPassword = storePassword
+                storeType = "PKCS12"
+            }
+        }
     }
-
     buildTypes {
-        debug {
-            isDebuggable = true
-            isMinifyEnabled = false
-        }
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            isDebuggable = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+        getByName("release") {
+            isMinifyEnabled = true; isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (rootProject.file(".local/local-test.p12").exists()) signingConfig = signingConfigs.getByName("local")
         }
     }
-
-    buildFeatures {
-        compose = true
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "/META-INF/**.version"
-            excludes += "okhttp3/**"
-            excludes += "kotlin/**"
-            excludes += "**.properties"
-            excludes += "**.bin"
-            excludes += "kotlin-tooling-metadata.json"
-        }
-    }
+    packaging { resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1") }
 }
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_22.majorVersion)
-    }
-}
-
-kotlin {
-    jvmToolchain(JavaVersion.VERSION_22.majorVersion.toInt())
-}
-
 dependencies {
-    implementation(libs.coreKtx)
-    implementation(libs.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.foundation)
-    debugImplementation(libs.compose.ui.tooling)
-    implementation(libs.miuix)
-    implementation(libs.miuix.icons)
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-android:0.2.9")
+    implementation("androidx.compose.ui:ui:1.7.0")
+    implementation("androidx.compose.foundation:foundation:1.7.0")
 }

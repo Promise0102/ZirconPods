@@ -1,0 +1,1 @@
+ZirconPods uses Miuix 0.2.9 (Apache-2.0), https://github.com/compose-miuix-ui/miuix/tree/v0.2.9 . AndroidX and Kotlin are distributed under their respective open-source licenses.
