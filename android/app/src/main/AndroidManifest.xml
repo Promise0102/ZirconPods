@@ -19,6 +19,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".NotificationPanelActivity" android:exported="false"
+            android:theme="@style/Theme.NotificationPanel" android:excludeFromRecents="true"
+            android:taskAffinity="" android:noHistory="true" />
         <service android:name=".EarphoneService" android:exported="false"
             android:foregroundServiceType="connectedDevice" />
         <service android:name=".EarphoneModeTile" android:exported="true" android:label="耳机模式"

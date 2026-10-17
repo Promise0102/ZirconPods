@@ -1,0 +1,8 @@
+<resources>
+    <!-- The SystemUI host owns the blurred surface. Do not paint an opaque card over it. -->
+    <color name="notification_card">#00000000</color>
+    <color name="notification_panel">#00000000</color>
+    <color name="notification_button">#30000000</color>
+    <color name="notification_text">#202020</color>
+    <color name="notification_muted">#777777</color>
+</resources>

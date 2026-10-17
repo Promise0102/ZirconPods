@@ -33,6 +33,10 @@ public final class EarphoneService extends Service implements BluetoothControlle
     private BluetoothController controller;
     private NoiseNotification notification;
     private LiveConnectionNotification liveConnection;
+    private android.content.SharedPreferences appearance;
+    private final android.content.SharedPreferences.OnSharedPreferenceChangeListener appearanceListener = (prefs, key) -> {
+        if ("product_color".equals(key)) scheduleNotification();
+    };
     private boolean foreground, launchingConnection, destroying, notificationScheduled;
     private final Runnable updateNotification = () -> {
         notificationScheduled = false;
@@ -63,6 +67,8 @@ public final class EarphoneService extends Service implements BluetoothControlle
         notification = new NoiseNotification(this);
         liveConnection = new LiveConnectionNotification(this, this::onLog);
         controller = new BluetoothController(this, this);
+        appearance = getSharedPreferences("appearance", MODE_PRIVATE);
+        appearance.registerOnSharedPreferenceChangeListener(appearanceListener);
     }
     @Override public IBinder onBind(Intent intent) { return binder; }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -206,6 +212,7 @@ public final class EarphoneService extends Service implements BluetoothControlle
     }
     @Override public void onDestroy() {
         destroying = true;
+        if (appearance != null) appearance.unregisterOnSharedPreferenceChangeListener(appearanceListener);
         AutoConnection.busy = false;
         main.removeCallbacksAndMessages(null);
         listeners.clear();

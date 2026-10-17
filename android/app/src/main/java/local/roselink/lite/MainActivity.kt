@@ -351,7 +351,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             Entry("系统蓝牙设置") { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
         }
         Group {
-            SuperSwitch(title = "流体云连接提示", summary = "兼容测试 · 连接完成后短时显示电量与模式",
+            SuperSwitch(title = "流体云连接提示", summary = "兼容测试 · 连接完成后显示耳机图与电量 10 秒",
                 checked = cloudEnabled, enabled = LiveConnectionNotification.apiAvailable(),
                 insideMargin = DpSize(20.dp, 20.dp), onCheckedChange = {
                     cloudEnabled = it
@@ -363,7 +363,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             Button(text = "重新检查系统支持", onClick = { cloudStatus = LiveConnectionNotification.status(this@MainActivity) }, modifier = Modifier.padding(start = 20.dp, bottom = 18.dp))
         }
         Group {
-            Text("ZirconPods 0.7.0", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            Text("ZirconPods 0.8.1", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 18.sp, fontWeight = FontWeight.Medium)
             Text("Miuix 主题 · 锆势本地蓝牙控制", Modifier.padding(20.dp), color = muted, fontSize = 14.sp)
         }
     }

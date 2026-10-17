@@ -1,0 +1,7 @@
+<resources>
+    <color name="notification_card">#00000000</color>
+    <color name="notification_panel">#00000000</color>
+    <color name="notification_button">#30FFFFFF</color>
+    <color name="notification_text">#F3F3F3</color>
+    <color name="notification_muted">#B8B8BC</color>
+</resources>

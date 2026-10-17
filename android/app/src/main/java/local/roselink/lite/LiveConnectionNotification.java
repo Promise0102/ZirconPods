@@ -99,7 +99,8 @@ final class LiveConnectionNotification {
         if (!preferences.getBoolean(ENABLED, true)) { cancel(); return; }
         String content = ConnectionPopupWindow.text(state);
         String chip = ConnectionPopupWindow.chip(state);
-        String nextSignature = chip + content;
+        String title = EarphoneCardContent.title(state);
+        String nextSignature = title + chip + content + NotificationProductImage.color(context);
         if (!signature.equals(nextSignature)) {
             try {
                 PendingIntent open = PendingIntent.getActivity(context, 0,
@@ -111,7 +112,7 @@ final class LiveConnectionNotification {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 Notification.Builder builder = new Notification.Builder(context, CHANNEL)
                         .setSmallIcon(R.drawable.ic_notification)
-                        .setContentTitle(state.connected ? "ZirconPods · 耳机已连接" : "ZirconPods · 正在连接")
+                        .setContentTitle(title).setLargeIcon(NotificationProductImage.icon(context))
                         .setContentText(content).setStyle(new Notification.BigTextStyle().bigText(content))
                         .setContentIntent(open).setDeleteIntent(dismiss)
                         .setCategory(Notification.CATEGORY_PROGRESS).setOngoing(true).setOnlyAlertOnce(true)

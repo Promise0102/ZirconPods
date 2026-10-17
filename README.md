@@ -1,10 +1,18 @@
 # ZirconPods
 
-![Version](https://img.shields.io/badge/version-0.7.0-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+![Version](https://img.shields.io/badge/version-0.8.1-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
-为弱水时砂锆势（ROSE Zircon）耳机提供简洁的 Android 本地蓝牙控制。当前版本 **0.7.0**，Android 8.0 及以上。
+为弱水时砂锆势（ROSE Zircon）耳机提供简洁的 Android 本地蓝牙控制。当前源码版本 **0.8.1**，Android 8.0 及以上。
 
-[下载 APK](https://github.com/Promise0102/ZirconPods/releases/tag/v0.7.0) · [Android 项目与构建](android/README.md) · [自动连接与磁贴](android/自动连接与快捷磁贴说明.md)
+[下载 APK](https://github.com/Promise0102/ZirconPods/releases/tag/v0.8.1) · [更新日志](CHANGELOG.md) · [Android 项目与构建](android/README.md) · [自动连接与磁贴](android/自动连接与快捷磁贴说明.md)
+
+## 0.8.1 毛玻璃背景修复
+
+移除自绘通知的白色卡片与不透明分组底色，按钮改为半透明，透出 ColorOS 原有通知毛玻璃。左侧应用图标和顶部应用名属于系统强制模板，普通 APK 无法删除；详见 [修复说明](android/毛玻璃通知修复说明.md)。
+
+## 0.8.0 通知更新
+
+折叠通知采用耳机图、电量及两个操作按钮；展开为三路电量、四模式和降噪等级。流体云去掉操作按钮，共用设备图和电量，成功连接后显示 10 秒。设计与限制见 [截图通知说明](android/截图通知说明.md)。0.8.0 未单独发布到 GitHub，其变化包含在 v0.8.1 中。
 
 ## 功能
 
@@ -19,7 +27,7 @@
 
 ## 安装与使用
 
-1. 从 [v0.7.0 Release](https://github.com/Promise0102/ZirconPods/releases/tag/v0.7.0) 下载 APK。
+1. 从 [v0.8.1 Release](https://github.com/Promise0102/ZirconPods/releases/tag/v0.8.1) 下载签名 APK，使用相同包名与原发布签名，可覆盖更新此前版本。
 2. 手机系统蓝牙先配对耳机；打开应用，允许附近设备和通知权限。
 3. 点击左上角设备面板，扫描并手动连接成功一次；此后可使用自动连接。
 4. 在设置中选择“添加耳机模式磁贴”，或下拉控制中心、点击铅笔后添加“耳机模式”。
@@ -39,7 +47,7 @@ cd android
 
 Windows 构建脚本在 ASCII 临时目录编译，并验证 APK 签名和对齐；首次构建会生成自己的本地签名。原发布私钥不入库，自建签名 APK 无法覆盖原发布签名安装包。其他平台可使用 Gradle wrapper 构建 debug 版本。
 
-已通过 **161 项主机检查**：77 项协议、22 项通知状态、19 项连接提示生命周期、43 项自动连接与磁贴循环。当前 0.7.0 尚未在 Find N2 或其他 Android 实机上完成安装、蓝牙控制、通知和后台行为验证。
+协议与状态模型已通过 **184 项主机检查**：77 项协议、22 项通知状态、19 项连接提示生命周期、43 项自动连接与磁贴循环、23 项共用卡片内容和计时边界。0.8.1 另检查了浅/深色透明资源并完成 release 编译、签名与对齐校验。已根据用户的 ColorOS 通知截图修复白色套卡；本次透明效果、快捷面板交互、流体云提升和完整蓝牙兼容性仍待实机确认。
 
 ## 协议与文档
 

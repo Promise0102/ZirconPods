@@ -1,21 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-<LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:baselineAligned="false">
-<LinearLayout android:id="@+id/mode_anc" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
-<ImageView android:id="@+id/icon_anc" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
-<TextView android:id="@+id/label_anc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
-</LinearLayout>
-<LinearLayout android:id="@+id/mode_wind" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
-<ImageView android:id="@+id/icon_wind" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
-<TextView android:id="@+id/label_wind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
-</LinearLayout>
-<LinearLayout android:id="@+id/mode_transparency" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
-<ImageView android:id="@+id/icon_transparency" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
-<TextView android:id="@+id/label_transparency" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
-</LinearLayout>
-<LinearLayout android:id="@+id/mode_normal" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
-<ImageView android:id="@+id/icon_normal" android:layout_width="28dp" android:layout_height="28dp" android:importantForAccessibility="no" />
-<TextView android:id="@+id/label_normal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="11sp" android:includeFontPadding="false" android:maxLines="1" android:importantForAccessibility="no" />
-</LinearLayout>
-</LinearLayout>
+<!-- Both rows fit the Android 12+ 48dp collapsed custom-content allowance. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="48dp" android:orientation="vertical" android:background="@drawable/notification_card">
+    <LinearLayout android:id="@+id/notification_header" android:layout_width="match_parent" android:layout_height="27dp" android:orientation="horizontal" android:gravity="center_vertical" android:clickable="true" android:focusable="true">
+        <ImageView android:id="@+id/notification_product" android:layout_width="29dp" android:layout_height="27dp" android:scaleType="fitCenter" android:contentDescription="锆势耳机与充电盒" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:gravity="center_vertical" android:paddingStart="7dp">
+            <TextView android:id="@+id/notification_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="12sp" android:textStyle="bold" android:includeFontPadding="false" android:singleLine="true" android:ellipsize="end" android:textColor="@color/notification_text" />
+            <TextView android:id="@+id/notification_batteries" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="10sp" android:includeFontPadding="false" android:singleLine="true" android:ellipsize="end" android:textColor="@color/notification_muted" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="21dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/notification_switch" android:layout_width="0dp" android:layout_height="20dp" android:layout_weight="1" android:layout_marginEnd="4dp" android:background="@drawable/notification_button" android:gravity="center" android:text="切换声音模式" android:textSize="10sp" android:includeFontPadding="false" android:singleLine="true" android:textColor="@color/notification_text" android:clickable="true" android:focusable="true" android:contentDescription="打开耳机噪声控制快捷面板" />
+        <TextView android:id="@+id/notification_disconnect" android:layout_width="0dp" android:layout_height="20dp" android:layout_weight="1" android:layout_marginStart="4dp" android:background="@drawable/notification_button" android:gravity="center" android:text="断开连接" android:textSize="10sp" android:includeFontPadding="false" android:singleLine="true" android:textColor="@color/notification_text" android:clickable="true" android:focusable="true" android:contentDescription="断开耳机控制连接" />
+    </LinearLayout>
 </LinearLayout>
