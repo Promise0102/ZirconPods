@@ -88,7 +88,7 @@ BTA_JvRfcommWrite: write ok                                ← App 持续收发
 RFCOMM_BufDataInd: buf_len=7 (高频) / 9 / 10 / 26          ← 小包心跳/轮询
 ```
 
-- nRF Connect 连到的 `ZZZ (60:51:C7:26:AA:64)` 有 LE Audio 标准服务（0x184C/0x1849/0x1855）+ 0xFCC0，但**无** 0x7034/0cf12d31 → **不是锆势**（是用户另一台设备）；锆势的 BLE 无私有控制服务。
+- nRF Connect 连到的 `ZZZ`（蓝牙地址已脱敏）有 LE Audio 标准服务（0x184C/0x1849/0x1855）+ 0xFCC0，但**无** 0x7034/0cf12d31 → **不是锆势**（是用户另一台设备）；锆势的 BLE 无私有控制服务。
 - 技术路线与 OppoPods 相同：RFCOMM 私有协议帧（hex 样本见 §4）。
 
 ## 6. 下一步
@@ -101,7 +101,7 @@ RFCOMM_BufDataInd: buf_len=7 (高频) / 9 / 10 / 26          ← 小包心跳/�
 ## 7. 黑盒协议破解进展（PC AF_BTH 直连实验，2026-02）
 
 ### 连接参数（已实锤）
-- 通道：经典蓝牙 **RFCOMM SCN 6**，MAC `95:11:06:00:48:78`（PC 侧 AF_BTH socket 直连成功过多次）
+- 通道：经典蓝牙 **RFCOMM SCN 6**，设备蓝牙地址已脱敏（PC 侧 AF_BTH socket 直连成功过多次）
 - **连接模型**：耳机**只允许一个 RFCOMM 控制会话**；控制权由最近连接者持有；空闲后耳机休眠（需佩戴/播放唤醒）
 
 ### 帧格式（已破解）

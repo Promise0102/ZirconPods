@@ -84,6 +84,15 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     private var notificationAddress: String? = null
     private var destroyed = false
     private lateinit var client: BluetoothClient
+    private lateinit var phoneEqClient: PhoneEqClient
+    private var phoneEq by mutableStateOf(PhoneEqState())
+    private var pendingPhoneEq: (() -> Unit)? = null
+    private var importedCurve by mutableStateOf<GraphicEqFile.Curve?>(null)
+    private var eqImportHint by mutableStateOf("")
+    private var eqImportGeneration = 0
+    private val eqFilePicker = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) readEqFile(uri) else eqImportHint = "已取消文件选择"
+    }
     private val specs = ZirconProtocol.controls().associateBy { it.key }
     private val accent = Color(0xff3482ff)
     private val background = Color(0xfff7f7f7)
@@ -101,6 +110,8 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         autoEnabled = AutoConnection.enabled(this)
         autoStatus = AutoConnection.status(this)
         client = BluetoothClient(this, this)
+        phoneEqClient = PhoneEqClient(this) { next -> runOnUiThread { if (!destroyed) phoneEq = next.copy() } }
+        handlePhoneEqIntent(intent)
         if (intent.action == "local.roselink.lite.OPEN_PAIRING") pairing = true
         setContent {
             MiuixTheme(colors = lightColorScheme()) { App() }
@@ -117,6 +128,15 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
                         .padding(horizontal = 12.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         when (page) {
                             "home" -> Home()
+                            "custom_eq" -> CustomEqScreen(device, remember { CustomEqPresets(this@MainActivity) },
+                                read = { safe { client.queryCustomEq() } }, apply = { gains -> safe { client.applyCustomEq(gains) } },
+                                copyDiagnostics = { copy("ZirconPods EQ 诊断", "ZirconPods 0.11.0\n手机：${Build.MANUFACTURER} ${Build.MODEL}\nAndroid ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}\n${device.customEqDiagnostics}") },
+                                phone = phoneEq, enablePhone = { gains, global -> enablePhoneEq(gains, global) },
+                                disablePhone = { phoneEqClient.disable() }, retryPhone = { phoneEqClient.retry() },
+                                copyPhoneDiagnostics = { copy("ZirconPods 手机 EQ 诊断", "ZirconPods 0.11.0\n手机：${Build.MANUFACTURER} ${Build.MODEL}\n${phoneEq.diagnostic}") },
+                                importFile = { importedCurve = null; eqImportHint = "选择包含GraphicEQ曲线的文本文件"; ++eqImportGeneration; eqFilePicker.launch(arrayOf("*/*")) },
+                                imported = importedCurve, importHint = eqImportHint,
+                                consumeImport = { importedCurve = null; eqImportHint = "" })
                             "touch" -> TouchSettings()
                             "lab" -> Laboratory()
                             "cycle" -> AncCycle()
@@ -124,6 +144,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
                             "settings" -> SettingsPage()
                             "info" -> Information()
                             "logs" -> Logs()
+                            "licenses" -> OpenSourceLicenses()
                         }
                     }
                 }
@@ -135,12 +156,14 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     @Composable private fun Header() {
         val title = when (page) {
             "home" -> "ROSE Zircon"
+            "custom_eq" -> "自定义 EQ"
             "touch" -> "触控设置"
             "lab" -> "实验室功能"
             "cycle" -> "降噪触控设置"
             "find" -> "查找设备"
             "settings" -> "设置"
             "info" -> "设备信息"
+            "licenses" -> "开源许可"
             else -> "诊断日志"
         }
         Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -201,7 +224,10 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             }
             if (device.values["noise"] == 6) Text("当前：极限降噪", Modifier.padding(start = 20.dp, bottom = 16.dp), color = accent, fontSize = 13.sp)
         }
-        Group { DeviceDropdown("eq", title = "超级大师调音") }
+        Group {
+            DeviceDropdown("eq", title = "超级大师调音")
+            Entry("自定义 EQ", "手机端十段调节 · 本地预设 · 播放器会话 / 全局兼容") { page = "custom_eq" }
+        }
         Group {
             Toggle("game", "游戏模式", "降低延迟，声音响应更快")
             Toggle("multipoint", "双设备连接", "允许耳机同时连接两个设备")
@@ -242,6 +268,13 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
 
     @Composable private fun DeviceDropdown(key: String, title: String? = null, subtitle: String? = null) {
         val spec = specs.getValue(key)
+        if (key == "eq") {
+            val current = device.values[key]
+            Picker(title ?: spec.title, subtitle, spec.labels.toList() + "自定义 EQ", if (current == 4) spec.values.size else spec.values.indexOf(current ?: -1), device.connected) {
+                if (it == spec.values.size) page = "custom_eq" else send(key, spec.values[it])
+            }
+            return
+        }
         Picker(title ?: spec.title, subtitle, spec.labels.toList(), spec.values.indexOf(device.values[key] ?: -1), device.connected) {
             send(key, spec.values[it])
         }
@@ -347,6 +380,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         Group {
             Entry("设备信息") { page = "info" }
             Entry("诊断日志") { page = "logs" }
+            Entry("开源许可", "Equalizer314 · VLC 风格预设") { page = "licenses" }
             Entry("通知栏控制设置") { startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
             Entry("系统蓝牙设置") { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
         }
@@ -363,7 +397,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             Button(text = "重新检查系统支持", onClick = { cloudStatus = LiveConnectionNotification.status(this@MainActivity) }, modifier = Modifier.padding(start = 20.dp, bottom = 18.dp))
         }
         Group {
-            Text("ZirconPods 0.8.1", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            Text("ZirconPods 0.11.0 · 风格预设与导入", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 18.sp, fontWeight = FontWeight.Medium)
             Text("Miuix 主题 · 锆势本地蓝牙控制", Modifier.padding(20.dp), color = muted, fontSize = 14.sp)
         }
     }
@@ -372,6 +406,19 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         val info = "设备名称  ${device.name}\n蓝牙地址  ${device.address.ifEmpty { "未连接" }}\n固件版本  ${device.firmware.ifEmpty { "未读取" }}\n连接状态  ${device.status}"
         Group { SelectionContainer { Text(info, Modifier.padding(20.dp), fontSize = 15.sp, lineHeight = 28.sp) } }
         Button(text = "复制设备信息", onClick = { copy("ZirconPods 设备信息", info) }, modifier = Modifier.padding(horizontal = 12.dp))
+    }
+
+    @Composable private fun OpenSourceLicenses() {
+        val license = remember { assets.open("licenses/Equalizer314-GPL-3.0.txt").bufferedReader().use { it.readText() } }
+        val vlcLicense = remember { assets.open("licenses/VLC-presets-LGPL-2.1.txt").bufferedReader().use { it.readText() } }
+        Group {
+            Text("手机端 EQ 部分移植自 Equalizer314（bearinmindcat 与贡献者），GPL-3.0。\n固定版本：90dd51a8f3e1333b7ffcfedba4e167ab3f250034\nhttps://github.com/bearinmindcat/Equalizer314\n\nZirconPods 对引擎频带、余量、服务与界面做了修改。",
+                Modifier.padding(20.dp), fontSize = 13.sp)
+        }
+        Group { SelectionContainer { Text(license, Modifier.padding(16.dp), fontSize = 10.sp) } }
+        Group { Text("部分风格数据改编自 VLC equalizer_presets.h\nCopyright (C) 2004 VLC authors and VideoLAN; Laurent Aimar\nLGPL-2.1-or-later，已转换为十段参考曲线。\nhttps://github.com/videolan/vlc",
+            Modifier.padding(20.dp), fontSize = 13.sp) }
+        Group { SelectionContainer { Text(vlcLicense, Modifier.padding(16.dp), fontSize = 10.sp) } }
     }
 
     @Composable private fun Logs() {
@@ -424,6 +471,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handlePhoneEqIntent(intent)
         if (intent.action == LiveConnectionNotification.ACTION_OPEN_CONTROLS) {
             page = "home"
             pairing = false
@@ -459,7 +507,54 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             toast("该系统未提供独立入口，请检查应用通知中的实时更新设置")
         }
     }
-    private fun goBack() { page = when (page) { "cycle" -> "lab"; "info", "logs" -> "settings"; else -> "home" } }
+    private fun goBack() { page = when (page) { "cycle" -> "lab"; "info", "logs", "licenses" -> "settings"; else -> "home" } }
+    private fun handlePhoneEqIntent(intent: Intent) {
+        if (intent.action == PhoneEqService.OPEN || intent.action == android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL) {
+            page = "custom_eq"
+            phoneEqClient.offerSession(intent.getIntExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, -1),
+                intent.getStringExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME).orEmpty())
+        }
+    }
+    private fun enablePhoneEq(gains: IntArray, global: Boolean) {
+        val snapshot = gains.clone()
+        val action = { phoneEqClient.enable(snapshot, global) }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            && !getPreferences(MODE_PRIVATE).getBoolean("phone_eq_notification_asked", false)) {
+            pendingPhoneEq = action
+            getPreferences(MODE_PRIVATE).edit().putBoolean("phone_eq_notification_asked", true).apply()
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 44)
+        } else action()
+    }
+    private fun readEqFile(uri: android.net.Uri) {
+        val generation = ++eqImportGeneration
+        eqImportHint = "正在读取并预览文件…"
+        Thread({
+            try {
+                var filename = "导入音效"
+                contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) filename = cursor.getString(0).orEmpty().take(100)
+                }
+                val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(4096)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        require(output.size() + count <= GraphicEqFile.MAX_BYTES) { "文件超过128KiB" }
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("无法打开该文件")
+                val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+                val text = decoder.decode(java.nio.ByteBuffer.wrap(bytes)).toString()
+                val curve = GraphicEqFile.parse(text, filename.substringBeforeLast('.'))
+                runOnUiThread { if (!destroyed && generation == eqImportGeneration) { importedCurve = curve; eqImportHint = "读取成功，确认预览后载入" } }
+            } catch (error: Exception) {
+                runOnUiThread { if (!destroyed && generation == eqImportGeneration) { importedCurve = null; eqImportHint = "导入失败：${error.message ?: "请使用UTF-8 GraphicEQ文本"}" } }
+            }
+        }, "eq-file-import").apply { isDaemon = true; start() }
+    }
     private fun withBluetooth(action: () -> Unit) {
         pendingAction = action
         val permissions = if (Build.VERSION.SDK_INT >= 31)
@@ -490,7 +585,10 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 43) {
+        if (requestCode == 44) {
+            val action = pendingPhoneEq; pendingPhoneEq = null
+            if (!destroyed) action?.invoke()
+        } else if (requestCode == 43) {
             val address = notificationAddress; notificationAddress = null
             if (grantResults.isEmpty() || grantResults[0] != PackageManager.PERMISSION_GRANTED) toast("可从设置中开启通知栏控制")
             if (address != null && !destroyed) safe { client.connect(address) }
@@ -531,7 +629,9 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(title, text)); toast("已复制")
     }
     override fun onDestroy() {
-        destroyed = true; pendingAction = null; notificationAddress = null
+        destroyed = true; pendingAction = null; notificationAddress = null; pendingPhoneEq = null
+        ++eqImportGeneration
+        if (::phoneEqClient.isInitialized) phoneEqClient.close()
         if (::client.isInitialized) client.close()
         super.onDestroy()
     }

@@ -1,0 +1,7 @@
+# Name: 流行
+# Source: VideoLAN VLC / pop / legacy-frequency-table
+# License: LGPL-2.1-or-later
+# Copyright: (C) 2004 VLC authors and VideoLAN; Laurent Aimar
+# URL: https://github.com/videolan/vlc/blob/6050eca3f959eb84316083d7fb2671b7e05cc8b5/modules/audio_filter/equalizer_presets.h
+# Adaptation: Original preamp omitted; log-frequency resampling, +/-6dB normalization and 1dB rounding by ZirconPods. Not device-specific correction.
+GraphicEQ: 60 -1.6; 170 4.8; 310 7.2; 600 8; 1000 5.6; 3000 -1.11022E-15; 6000 -2.4; 12000 -2.4; 14000 -1.6; 16000 -1.6

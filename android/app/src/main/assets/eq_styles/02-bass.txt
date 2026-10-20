@@ -1,0 +1,7 @@
+# Name: 低音增强
+# Source: Equalizer314 / loadPreset style formula adapted to ten control points
+# License: GPL-3.0
+# Copyright: Equalizer314 contributors
+# URL: https://github.com/bearinmindcat/Equalizer314/blob/90dd51a8f3e1333b7ffcfedba4e167ab3f250034/app/src/main/java/com/bearinmind/equalizer314/dsp/ParametricEqualizer.kt
+# Adaptation: Shape formula only, not the original parametric filter response. Not device-specific correction.
+GraphicEQ: 20 8; 100 7.11111111; 300 6.22222222; 500 5.33333333; 1000 4.44444444; 2000 3.55555556; 3000 2.66666667; 5000 1.77777778; 8000 0.888888889; 15000 0

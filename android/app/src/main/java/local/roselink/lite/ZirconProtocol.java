@@ -115,6 +115,12 @@ public final class ZirconProtocol {
         if (payload == null || state == null || payload.length < 2) return false;
         int type = payload[0] & 255, value = payload[1] & 255;
         switch (type) {
+            case 0x3e:
+                int[] gains = CustomEqProtocol.parse(payload);
+                if (gains == null) return false;
+                state.customEq = gains;
+                state.customEqRevision++;
+                return true;
             case 0x36: // handleAncList 0xf081d0, four independent boolean bytes.
                 if (payload.length != 5) return false;
                 int mask = 0;

@@ -47,6 +47,11 @@ final class BluetoothClient {
     void scan() { ready(() -> service.scan()); }
     void refresh() { ready(() -> service.refresh()); }
     void command(String key, int value) { ready(() -> service.command(key, value)); }
+    void queryCustomEq() { ready(() -> service.queryCustomEq()); }
+    void applyCustomEq(int[] gains) {
+        final int[] snapshot = gains == null ? null : gains.clone();
+        ready(() -> service.applyCustomEq(snapshot));
+    }
     void disconnect() { ready(() -> service.disconnect()); }
     void autoConnect() { ready(() -> AutoConnection.start(context, AutoConnection.address(context), "打开应用")); }
     void tileClick(Runnable needsPairing) { ready(() -> service.tileClick(needsPairing)); }

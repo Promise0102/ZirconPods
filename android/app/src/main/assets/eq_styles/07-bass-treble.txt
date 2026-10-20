@@ -1,0 +1,7 @@
+# Name: 低音与高音
+# Source: VideoLAN VLC / fullbasstreble / legacy-frequency-table
+# License: LGPL-2.1-or-later
+# Copyright: (C) 2004 VLC authors and VideoLAN; Laurent Aimar
+# URL: https://github.com/videolan/vlc/blob/6050eca3f959eb84316083d7fb2671b7e05cc8b5/modules/audio_filter/equalizer_presets.h
+# Adaptation: Original preamp omitted; log-frequency resampling, +/-6dB normalization and 1dB rounding by ZirconPods. Not device-specific correction.
+GraphicEQ: 60 7.2; 170 5.6; 310 -1.11022E-15; 600 -7.2; 1000 -4.8; 3000 1.6; 6000 8; 12000 11.2; 14000 12; 16000 12

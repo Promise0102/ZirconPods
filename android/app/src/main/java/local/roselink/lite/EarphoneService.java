@@ -151,6 +151,8 @@ public final class EarphoneService extends Service implements BluetoothControlle
         }
         command("noise", next);
     }
+    void queryCustomEq() { if (!destroying) controller.queryCustomEq(); }
+    void applyCustomEq(int[] gains) { if (!destroying) controller.applyCustomEq(gains); }
     void command(String key, int value) {
         if (destroying || !state.connected) return;
         if ("noise".equals(key)) {

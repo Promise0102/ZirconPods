@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "local.roselink.lite"
     compileSdk = 34
-    defaultConfig { applicationId = "local.roselink.lite"; minSdk = 26; targetSdk = 34; versionCode = 9; versionName = "0.8.1" }
+    defaultConfig { applicationId = "local.roselink.lite"; minSdk = 26; targetSdk = 34; versionCode = 13; versionName = "0.11.0" }
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
     kotlinOptions { jvmTarget = "1.8" }

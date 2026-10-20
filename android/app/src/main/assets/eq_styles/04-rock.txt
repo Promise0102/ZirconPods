@@ -1,0 +1,7 @@
+# Name: 摇滚
+# Source: VideoLAN VLC / rock / legacy-frequency-table
+# License: LGPL-2.1-or-later
+# Copyright: (C) 2004 VLC authors and VideoLAN; Laurent Aimar
+# URL: https://github.com/videolan/vlc/blob/6050eca3f959eb84316083d7fb2671b7e05cc8b5/modules/audio_filter/equalizer_presets.h
+# Adaptation: Original preamp omitted; log-frequency resampling, +/-6dB normalization and 1dB rounding by ZirconPods. Not device-specific correction.
+GraphicEQ: 60 8; 170 4.8; 310 -5.6; 600 -8; 1000 -3.2; 3000 4; 6000 8.8; 12000 11.2; 14000 11.2; 16000 11.2

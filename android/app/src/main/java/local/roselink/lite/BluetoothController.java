@@ -194,17 +194,101 @@ public final class BluetoothController {
             int n = input.read(buffer);
             if (n < 0) throw new IOException("耳机关闭了连接");
             final byte[] received = java.util.Arrays.copyOf(buffer, n);
-            main.post(() -> { if (!closed && session == generation) log("RX RAW " + hex(received)); });
+            main.post(() -> {
+                if (!closed && session == generation) { eqDiagnostics.raw(received); log("RX RAW " + hex(received)); }
+            });
             for (byte[] payload : decoder.accept(buffer, n)) {
                 main.post(() -> {
                     if (closed || session != generation) return;
                     lastReply = android.os.SystemClock.elapsedRealtime();
+                    eqDiagnostics.packet(payload);
                     log("RX " + hex(payload));
+                    long previousEqRevision = state.customEqRevision;
                     if (ZirconProtocol.apply(payload, state)) state.status = "已连接 · 状态已同步";
+                    if (state.customEqRevision != previousEqRevision && eqAwaitingReadback) {
+                        if (customEq.bands(state.customEq)) {
+                            send(CustomEqProtocol.select());
+                            final long operation = eqOperation;
+                            main.postDelayed(() -> {
+                                if (!closed && session == generation && operation == eqOperation && state.connected)
+                                    send(CustomEqProtocol.queryMode());
+                            }, 400);
+                        }
+                    }
+                    if ((payload[0] & 255) == 0x2a && (payload.length == 2 || payload.length == 3))
+                        customEq.mode(payload.length == 2 ? payload[1] & 255 : ((payload[1] & 255) << 8) | (payload[2] & 255));
+                    updateEqState();
                     emit();
                 });
             }
         }
+    }
+
+    private final CustomEqTransaction customEq = new CustomEqTransaction();
+    private final CustomEqDiagnostics eqDiagnostics = new CustomEqDiagnostics();
+    private String eqDiagnosticIdentity = "尚未执行 EQ 操作";
+    private long eqOperation;
+    private boolean eqAwaitingReadback;
+
+    public void queryCustomEq() {
+        if (closed || !customEq.beginRead(state.connected)) return;
+        final long operation = ++eqOperation;
+        final int session = generation;
+        eqDiagnostics.begin("只读 EQ 查询");
+        eqDiagnosticIdentity = "设备：" + state.name + "\n固件：" + (state.firmware.isEmpty() ? "未读取" : state.firmware);
+        eqAwaitingReadback = true;
+        updateEqState(); emit();
+        log("自定义 EQ：只读探测，等待十段有效回包；普通 ACK 不算支持");
+        send(CustomEqProtocol.query());
+        // A separate ordinary-mode query distinguishes a live control channel from complete silence.
+        main.postDelayed(() -> {
+            if (!closed && generation == session && eqOperation == operation && state.connected
+                    && customEq.phase() == CustomEqTransaction.Phase.READING) send(CustomEqProtocol.queryMode());
+        }, 1000);
+        // One bounded read-only retry, never a blind write or an automatic loop.
+        main.postDelayed(() -> {
+            if (!closed && generation == session && eqOperation == operation && state.connected
+                    && customEq.phase() == CustomEqTransaction.Phase.READING) {
+                log("自定义 EQ：尚未获得曲线，重试一次只读查询"); send(CustomEqProtocol.query());
+            }
+        }, 3000);
+        scheduleEqTimeout(operation);
+    }
+
+    public void applyCustomEq(int[] gains) {
+        if (closed || !customEq.beginApply(state.connected, state.customEq, gains)) {
+            log("自定义 EQ：请先连接并读取有效的十段数据，操作期间不可重复应用"); return;
+        }
+        final int session = generation;
+        final long operation = ++eqOperation;
+        eqDiagnostics.begin("EQ 写入与回读验证");
+        eqDiagnosticIdentity = "设备：" + state.name + "\n固件：" + (state.firmware.isEmpty() ? "未读取" : state.firmware);
+        eqAwaitingReadback = false;
+        updateEqState(); emit();
+        send(CustomEqProtocol.write(gains));
+        log("自定义 EQ：已排队写入，随后回读；曲线核对成功后才切换自定义模式");
+        main.postDelayed(() -> {
+            if (closed || session != generation || operation != eqOperation || !state.connected) return;
+            eqAwaitingReadback = true;
+            send(CustomEqProtocol.query());
+        }, 500);
+        scheduleEqTimeout(operation);
+    }
+
+    private void scheduleEqTimeout(long operation) {
+        final int session = generation;
+        main.postDelayed(() -> {
+            if (closed || generation != session || operation != eqOperation || !customEq.busy()) return;
+            customEq.timeout(); updateEqState(); emit(); log("自定义 EQ：" + state.customEqStatus);
+        }, 7000);
+    }
+
+    private void updateEqState() {
+        state.customEqBusy = customEq.busy();
+        state.customEqStatus = customEq.label();
+        if (!customEq.busy()) eqDiagnostics.finish(state.customEqStatus);
+        state.customEqDiagnosticSummary = eqDiagnostics.summary();
+        state.customEqDiagnostics = eqDiagnosticIdentity + "\n" + eqDiagnostics.report();
     }
 
     public void refresh() {
@@ -222,6 +306,7 @@ public final class BluetoothController {
 
     public void command(String key, int value) {
         if (closed || !state.connected) { log("尚未连接耳机"); return; }
+        if ("eq".equals(key) && customEq.busy()) { log("正在核对自定义 EQ，请完成后再切换预设"); return; }
         try {
             byte[] payload = ZirconProtocol.payload(key, value);
             send(payload);
@@ -240,7 +325,9 @@ public final class BluetoothController {
             if (closed || session != generation) return;
             try {
                 target.write(frame); target.flush();
-                main.post(() -> { if (session == generation) log("TX " + hex(frame)); });
+                main.post(() -> {
+                    if (session == generation) { eqDiagnostics.sent(frame); updateEqState(); emit(); log("TX " + hex(frame)); }
+                });
             } catch (IOException e) {
                 main.post(() -> { if (session == generation && !closed) disconnectWithStatus("写入失败：" + readable(e)); });
             }
@@ -251,6 +338,8 @@ public final class BluetoothController {
 
     private void disconnectWithStatus(String message) {
         generation++; refreshing = false;
+        ++eqOperation; eqAwaitingReadback = false; customEq.reset();
+        eqDiagnostics.finish("连接已断开：" + message); updateEqState();
         BluetoothSocket old = socket; socket = null; output = null;
         if (old != null) try { old.close(); } catch (IOException ignored) { }
         state.connected = false; state.connecting = false; state.clearReadings(); state.status = message;

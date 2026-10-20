@@ -10,6 +10,12 @@ public final class DeviceState {
     public boolean connecting;
     public int leftBattery = -1, rightBattery = -1, caseBattery = -1;
     public Map<String, Integer> values = new HashMap<>();
+    public int[] customEq;
+    public long customEqRevision;
+    public boolean customEqBusy;
+    public String customEqStatus = "锆势固件兼容性待验证，请先读取耳机 EQ";
+    public String customEqDiagnosticSummary = "尚无本次 EQ 诊断";
+    public String customEqDiagnostics = "尚无本次 EQ 诊断";
 
     public DeviceState copy() {
         DeviceState s = new DeviceState();
@@ -17,6 +23,10 @@ public final class DeviceState {
         s.connected = connected; s.connecting = connecting;
         s.leftBattery = leftBattery; s.rightBattery = rightBattery; s.caseBattery = caseBattery;
         s.values.putAll(values);
+        s.customEq = customEq == null ? null : customEq.clone();
+        s.customEqRevision = customEqRevision;
+        s.customEqBusy = customEqBusy; s.customEqStatus = customEqStatus;
+        s.customEqDiagnosticSummary = customEqDiagnosticSummary; s.customEqDiagnostics = customEqDiagnostics;
         return s;
     }
 
@@ -24,5 +34,7 @@ public final class DeviceState {
         leftBattery = rightBattery = caseBattery = -1;
         firmware = "";
         values.clear();
+        customEq = null; customEqRevision = 0; customEqBusy = false;
+        customEqStatus = "锆势固件兼容性待验证，请先读取耳机 EQ";
     }
 }
