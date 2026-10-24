@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "local.roselink.lite"
     compileSdk = 34
-    defaultConfig { applicationId = "local.roselink.lite"; minSdk = 26; targetSdk = 34; versionCode = 13; versionName = "0.11.0" }
+    defaultConfig { applicationId = "local.roselink.lite"; minSdk = 26; targetSdk = 34; versionCode = 17; versionName = "0.14.0" }
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8 }
     kotlinOptions { jvmTarget = "1.8" }
@@ -31,6 +31,7 @@ android {
     packaging { resources.excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1") }
 }
 dependencies {
+    implementation("androidx.window:window:1.3.0")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-android:0.2.9")
     implementation("androidx.compose.ui:ui:1.7.0")

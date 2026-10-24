@@ -5,13 +5,13 @@ import android.os.IBinder
 
 internal class PhoneEqClient(context: Context, private val listener: (PhoneEqState) -> Unit) {
     private val context = context.applicationContext
-    private var service: PhoneEqService? = null
+    private var service: PhoneEqEngine? = null
     private var closed = false
     private val pending = linkedMapOf<Int, String>()
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             if (closed) return
-            service = (binder as PhoneEqService.LocalBinder).service
+            service = (binder as EarphoneService.LocalBinder).service().phoneEq()
             service!!.addListener(listener)
             pending.forEach { (id, owner) -> service!!.offerSession(id, owner) }; pending.clear()
         }
@@ -20,11 +20,11 @@ internal class PhoneEqClient(context: Context, private val listener: (PhoneEqSta
             if (!closed) listener(PhoneEqState().apply { status = "手机 EQ 服务已停止，请重新启用" })
         }
     }
-    private val bound = this.context.bindService(Intent(this.context, PhoneEqService::class.java), connection, Context.BIND_AUTO_CREATE)
+    private val bound = this.context.bindService(Intent(this.context, EarphoneService::class.java), connection, Context.BIND_AUTO_CREATE)
     fun enable(gains: IntArray, global: Boolean) {
         if (closed) return
-        try { context.startForegroundService(Intent(context, PhoneEqService::class.java).setAction(PhoneEqService.ENABLE)
-            .putExtra(PhoneEqService.GAINS, gains.clone()).putExtra(PhoneEqService.GLOBAL, global)) }
+        try { context.startForegroundService(Intent(context, EarphoneService::class.java).setAction(PhoneEqEngine.ENABLE)
+            .putExtra(PhoneEqEngine.GAINS, gains.clone()).putExtra(PhoneEqEngine.GLOBAL, global)) }
         catch (error: Exception) { listener(PhoneEqState().apply { status = "启动手机EQ失败：${error.message}" }) }
     }
     fun disable() { service?.disable() }

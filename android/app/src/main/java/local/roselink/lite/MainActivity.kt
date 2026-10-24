@@ -30,6 +30,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -95,15 +97,15 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     }
     private val specs = ZirconProtocol.controls().associateBy { it.key }
     private val accent = Color(0xff3482ff)
-    private val background = Color(0xfff7f7f7)
-    private val muted = Color(0xff898989)
+    private val background: Color @Composable get() = MiuixTheme.colorScheme.background
+    private val muted: Color @Composable get() = MiuixTheme.colorScheme.onSurfaceVariantSummary
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applyAppearanceWindow()
         super.onCreate(savedInstanceState)
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        window.statusBarColor = android.graphics.Color.rgb(247, 247, 247)
-        window.navigationBarColor = android.graphics.Color.rgb(247, 247, 247)
+        page = savedInstanceState?.getString("current_page") ?: "home"
+        pairing = savedInstanceState?.getBoolean("pairing_open") ?: false
+        autoTriedThisVisit = savedInstanceState?.getBoolean("auto_tried") ?: false
         productColor = getSharedPreferences("appearance", MODE_PRIVATE).getInt("product_color", 0).coerceIn(0, 2)
         cloudEnabled = getSharedPreferences(LiveConnectionNotification.PREFERENCES, MODE_PRIVATE)
             .getBoolean(LiveConnectionNotification.ENABLED, true)
@@ -111,29 +113,34 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         autoStatus = AutoConnection.status(this)
         client = BluetoothClient(this, this)
         phoneEqClient = PhoneEqClient(this) { next -> runOnUiThread { if (!destroyed) phoneEq = next.copy() } }
-        handlePhoneEqIntent(intent)
-        if (intent.action == "local.roselink.lite.OPEN_PAIRING") pairing = true
+        if (savedInstanceState == null) {
+            handlePhoneEqIntent(intent)
+            if (intent.action == "local.roselink.lite.OPEN_PAIRING") pairing = true
+        }
         setContent {
-            MiuixTheme(colors = lightColorScheme()) { App() }
+            ZirconTheme(this) { App() }
         }
     }
 
     @Composable private fun App() {
+        val pageStates = rememberSaveableStateHolder()
         BackHandler(enabled = page != "home") { goBack() }
         Scaffold(containerColor = background) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding)) {
+            FoldAwareRegion(this, Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)).imePadding()) {
+            Column(Modifier.fillMaxSize()) {
                 Header()
-                key(page) {
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                pageStates.SaveableStateProvider(page) {
+                    Column(Modifier.widthIn(max = if (page == "home") 1120.dp else 840.dp).fillMaxWidth()
+                        .fillMaxHeight().verticalScroll(rememberScrollState())
                         .padding(horizontal = 12.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         when (page) {
                             "home" -> Home()
-                            "custom_eq" -> CustomEqScreen(device, remember { CustomEqPresets(this@MainActivity) },
-                                read = { safe { client.queryCustomEq() } }, apply = { gains -> safe { client.applyCustomEq(gains) } },
-                                copyDiagnostics = { copy("ZirconPods EQ 诊断", "ZirconPods 0.11.0\n手机：${Build.MANUFACTURER} ${Build.MODEL}\nAndroid ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}\n${device.customEqDiagnostics}") },
+                            "custom_eq" -> CustomEqScreen(remember { CustomEqPresets(this@MainActivity) },
                                 phone = phoneEq, enablePhone = { gains, global -> enablePhoneEq(gains, global) },
                                 disablePhone = { phoneEqClient.disable() }, retryPhone = { phoneEqClient.retry() },
-                                copyPhoneDiagnostics = { copy("ZirconPods 手机 EQ 诊断", "ZirconPods 0.11.0\n手机：${Build.MANUFACTURER} ${Build.MODEL}\n${phoneEq.diagnostic}") },
+                                copyPhoneDiagnostics = { copy("ZirconPods 手机 EQ 诊断", "ZirconPods 0.14.0\n手机：${Build.MANUFACTURER} ${Build.MODEL}\n${phoneEq.diagnostic}") },
                                 importFile = { importedCurve = null; eqImportHint = "选择包含GraphicEQ曲线的文本文件"; ++eqImportGeneration; eqFilePicker.launch(arrayOf("*/*")) },
                                 imported = importedCurve, importHint = eqImportHint,
                                 consumeImport = { importedCurve = null; eqImportHint = "" })
@@ -148,6 +155,8 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
                         }
                     }
                 }
+            }
+            }
             }
             if (pairing) PairingPanel()
         }
@@ -166,12 +175,13 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             "licenses" -> "开源许可"
             else -> "诊断日志"
         }
-        Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (page == "home") ResourceButton(R.drawable.ic_pairing, "配对与连接设备") { pairing = true }
-            else Box(Modifier.size(44.dp).clip(CircleShape).clickable { goBack() }, contentAlignment = Alignment.Center) {
+            else Box(Modifier.size(48.dp).clip(CircleShape).clickable { goBack() }, contentAlignment = Alignment.Center) {
                 Icon(MiuixIcons.ArrowBack, "返回", Modifier.size(27.dp))
             }
-            Text(title, Modifier.weight(1f).padding(start = 8.dp), fontSize = 23.sp, fontWeight = FontWeight.Medium)
+            Text(title, Modifier.weight(1f).padding(start = 8.dp), fontSize = 23.sp, fontWeight = FontWeight.Medium,
+                maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             if (page == "home") {
                 ResourceButton(R.drawable.ic_refresh, "刷新耳机状态", device.connected) { client.refresh() }
                 ResourceButton(R.drawable.ic_settings, "设置") { page = "settings" }
@@ -180,48 +190,45 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     }
 
     @Composable private fun ResourceButton(resource: Int, label: String, enabled: Boolean = true, action: () -> Unit) {
-        Box(Modifier.size(44.dp).clip(CircleShape).alpha(if (enabled) 1f else .35f)
+        Box(Modifier.size(48.dp).clip(CircleShape).alpha(if (enabled) 1f else .35f)
             .clickable(enabled = enabled, onClick = action).semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
-            Image(painterResource(resource), label, Modifier.size(26.dp))
+            Icon(painterResource(resource), label, Modifier.size(26.dp), tint = MiuixTheme.colorScheme.onSurface)
         }
     }
 
     @Composable private fun Home() {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val dual = AdaptiveLayoutPolicy.twoColumns(maxWidth.value, LocalDensity.current.fontScale)
+            if (dual) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Column(Modifier.weight(.42f), verticalArrangement = Arrangement.spacedBy(12.dp)) { HomeProduct() }
+                    Column(Modifier.weight(.58f), verticalArrangement = Arrangement.spacedBy(12.dp)) { HomeControls() }
+                }
+            } else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { HomeProduct(); HomeControls() }
+        }
+    }
+
+    @Composable private fun HomeProduct() {
         AndroidView(factory = { ProductImageView(it) }, update = { it.setColor(productColor) },
-            modifier = Modifier.fillMaxWidth().height(292.dp))
+            modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp))
         Group {
             Row(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Battery("左耳", device.leftBattery)
-                Battery("右耳", device.rightBattery)
-                Battery("充电盒", device.caseBattery)
+                Battery("左耳", device.leftBattery, Modifier.weight(1f))
+                Battery("右耳", device.rightBattery, Modifier.weight(1f))
+                Battery("充电盒", device.caseBattery, Modifier.weight(1f))
             }
-            SuperDropdown(title = "耳机配色", items = listOf("黑色", "银色", "紫色"), selectedIndex = productColor,
+            AdaptiveDropdown(title = "耳机配色", items = listOf("黑色", "银色", "紫色"), selectedIndex = productColor,
                 onSelectedIndexChange = {
                     productColor = it
                     getSharedPreferences("appearance", MODE_PRIVATE).edit().putInt("product_color", it).apply()
                 }, alwaysRight = true, insideMargin = DpSize(20.dp, 20.dp))
         }
+    }
+
+    @Composable private fun HomeControls() {
         Group {
             Text("噪声控制", Modifier.padding(start = 20.dp, top = 18.dp), fontSize = 17.sp)
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                val modes = listOf(1 to 0, 4 to 3, 3 to 2, 2 to 1)
-                for ((wire, kind) in modes) {
-                    val selected = device.values["noise"] == wire
-                    val glyph = remember(kind, selected) {
-                        Bitmap.createBitmap(104, 104, Bitmap.Config.ARGB_8888).also {
-                            NoiseModeDrawable(kind, selected, 2f).apply { setBounds(0, 0, 104, 104); draw(android.graphics.Canvas(it)) }
-                        }.asImageBitmap()
-                    }
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).clickable(enabled = device.connected) { send("noise", wire) }
-                        .padding(vertical = 8.dp).alpha(if (device.connected) 1f else .42f)
-                        .semantics { contentDescription = NoiseModeSelection.label(wire) + if (selected) "，耳机已确认" else "，点击切换" },
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        Image(glyph, null, Modifier.size(52.dp))
-                        Text(NoiseModeSelection.label(wire), Modifier.padding(top = 6.dp), fontSize = 14.sp,
-                            color = if (selected) accent else Color.Black)
-                    }
-                }
-            }
+            NoiseModeButtons(device) { send("noise", it) }
             if (device.values["noise"] == 6) Text("当前：极限降噪", Modifier.padding(start = 20.dp, bottom = 16.dp), color = accent, fontSize = 13.sp)
         }
         Group {
@@ -242,18 +249,18 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         Text(if (device.connected) "已连接 · 设置以耳机回复为准" else "打开耳机盒，点击左上角连接设备", Modifier.padding(horizontal = 12.dp), color = muted, fontSize = 12.sp)
     }
 
-    @Composable private fun Battery(label: String, value: Int) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    @Composable private fun Battery(label: String, value: Int, modifier: Modifier = Modifier) {
+        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, fontSize = 17.sp, fontWeight = FontWeight.Medium)
             Text(battery(value), Modifier.padding(top = 6.dp), fontSize = 13.sp, color = muted)
-            Box(Modifier.padding(top = 10.dp).width(44.dp).height(5.dp).clip(CircleShape).background(Color(0xffe7e7e7))) {
+            Box(Modifier.padding(top = 10.dp).width(44.dp).height(5.dp).clip(CircleShape).background(MiuixTheme.colorScheme.surfaceContainer)) {
                 if (value in 0..100) Box(Modifier.fillMaxWidth(value / 100f).fillMaxHeight().background(if (value <= 20) Color(0xffed704c) else Color(0xff00b589)))
             }
         }
     }
 
     @Composable private fun Group(content: @Composable ColumnScope.() -> Unit) {
-        Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = Color.White, content = content)
+        Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = MiuixTheme.colorScheme.surface, content = content)
     }
 
     @Composable private fun Entry(title: String, subtitle: String? = null, enabled: Boolean = true, action: () -> Unit) {
@@ -283,7 +290,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     @Composable private fun Picker(title: String, subtitle: String?, options: List<String>, selected: Int, enabled: Boolean, choose: (Int) -> Unit) {
         // Miuix requires a valid index. An explicit unknown sentinel avoids inventing a selected device option.
         val choices = if (selected < 0) options + "未读取" else options
-        SuperDropdown(title = title, summary = subtitle, items = choices,
+        AdaptiveDropdown(title = title, summary = subtitle, items = choices,
             selectedIndex = if (selected < 0) choices.lastIndex else selected,
             onSelectedIndexChange = { if (it in options.indices) choose(it) }, enabled = enabled,
             alwaysRight = true, insideMargin = DpSize(20.dp, 20.dp))
@@ -360,6 +367,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     }
 
     @Composable private fun SettingsPage() {
+        Group { ThemeSetting() }
         Group {
             SuperSwitch(title = "自动连接", summary = "打开应用或耳机重新连上手机时，连接上次成功使用的耳机",
                 checked = autoEnabled, insideMargin = DpSize(20.dp, 20.dp), onCheckedChange = {
@@ -397,7 +405,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
             Button(text = "重新检查系统支持", onClick = { cloudStatus = LiveConnectionNotification.status(this@MainActivity) }, modifier = Modifier.padding(start = 20.dp, bottom = 18.dp))
         }
         Group {
-            Text("ZirconPods 0.11.0 · 风格预设与导入", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            Text("ZirconPods 0.14.0 · EQ 收藏与快捷切换", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 18.sp, fontWeight = FontWeight.Medium)
             Text("Miuix 主题 · 锆势本地蓝牙控制", Modifier.padding(20.dp), color = muted, fontSize = 14.sp)
         }
     }
@@ -429,9 +437,11 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
 
     @Composable private fun PairingPanel() {
         Dialog(onDismissRequest = { pairing = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
-                Card(Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f).fillMaxHeight(), cornerRadius = 24.dp, color = background) {
-                    Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            FoldAwareRegion(this@MainActivity, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.CenterStart) {
+                Card(Modifier.widthIn(max = 420.dp).fillMaxWidth(.94f).fillMaxHeight(), cornerRadius = 24.dp, color = background) {
+                    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text("连接设备", fontSize = 25.sp, fontWeight = FontWeight.Medium)
                         Text(device.status, color = if (device.connected) accent else muted, fontSize = 14.sp)
                         Text(scanHint, fontSize = 13.sp, color = muted)
@@ -444,11 +454,13 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
                                 withBluetooth { connectWithNotification(record.address) }
                             }
                         }
+                    }
                         Button(text = "返回控制界面", modifier = Modifier.fillMaxWidth(), onClick = { pairing = false })
                     }
                 }
             }
         }
+    }
     }
 
     private fun send(key: String, value: Int) {
@@ -509,7 +521,7 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
     }
     private fun goBack() { page = when (page) { "cycle" -> "lab"; "info", "logs", "licenses" -> "settings"; else -> "home" } }
     private fun handlePhoneEqIntent(intent: Intent) {
-        if (intent.action == PhoneEqService.OPEN || intent.action == android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL) {
+        if (intent.action == PhoneEqEngine.OPEN || intent.action == android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL) {
             page = "custom_eq"
             phoneEqClient.offerSession(intent.getIntExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, -1),
                 intent.getStringExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME).orEmpty())
@@ -634,5 +646,11 @@ class MainActivity : ComponentActivity(), BluetoothController.Listener {
         if (::phoneEqClient.isInitialized) phoneEqClient.close()
         if (::client.isInitialized) client.close()
         super.onDestroy()
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("current_page", page)
+        outState.putBoolean("pairing_open", pairing)
+        outState.putBoolean("auto_tried", autoTriedThisVisit)
+        super.onSaveInstanceState(outState)
     }
 }

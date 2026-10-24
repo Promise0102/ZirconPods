@@ -1,1 +1,5 @@
 ZirconPods uses Miuix 0.2.9 (Apache-2.0), https://github.com/compose-miuix-ui/miuix/tree/v0.2.9 . AndroidX and Kotlin are distributed under their respective open-source licenses.
+
+Fold/window tracking uses AndroidX WindowManager 1.3.0, Copyright The Android Open Source Project, Apache-2.0.
+https://android.googlesource.com/platform/frameworks/support/+/androidx-window-release/window/
+Apache-2.0 license text is included in Miuix-LICENSE.txt in this directory.

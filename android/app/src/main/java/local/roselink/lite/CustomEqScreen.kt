@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -36,25 +37,26 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.UUID
 import kotlin.math.roundToInt
 
 @Composable
-internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: () -> Unit, apply: (IntArray) -> Unit,
-    copyDiagnostics: () -> Unit, phone: PhoneEqState, enablePhone: (IntArray, Boolean) -> Unit,
+internal fun CustomEqScreen(store: CustomEqPresets, phone: PhoneEqState, enablePhone: (IntArray, Boolean) -> Unit,
     disablePhone: () -> Unit, retryPhone: () -> Unit, copyPhoneDiagnostics: () -> Unit,
     importFile: () -> Unit, imported: GraphicEqFile.Curve?, importHint: String, consumeImport: () -> Unit) {
     val accent = Color(0xff3482ff)
-    val muted = Color(0xff898989)
+    val muted = MiuixTheme.colorScheme.onSurfaceVariantSummary
     var presets by remember { mutableStateOf(store.load()) }
     var selectedId by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("我的音效") }
     var gains by rememberSaveable { mutableStateOf(phone.gains.clone()) }
     var globalMode by rememberSaveable { mutableStateOf(phone.global) }
     var initialPhoneLoaded by rememberSaveable { mutableStateOf(false) }
-    var showHardware by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
-    val styles = remember(context) { EqStyleCatalog.load(context) }
+    val styleEntries = remember(context) { EqStyleCatalog.entries(context) }
+    val styles = styleEntries.map { it.curve }
+    val favorites = rememberEqFavorites(store)
     var selectedStyle by rememberSaveable { mutableStateOf(-1) }
     var fileReference by remember { mutableStateOf<GraphicEqFile.Curve?>(null) }
     LaunchedEffect(phone.loaded) {
@@ -67,10 +69,39 @@ internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: (
     var deletePending by remember { mutableStateOf(false) }
     val selected = presets.indexOfFirst { it.id == selectedId }
     val dirty = selected < 0 || presets[selected].name != name || presets[selected].gains != gains.toList()
+    val draftKey = when {
+        selected >= 0 && !dirty -> "local:$selectedId"
+        selectedId.isEmpty() && selectedStyle in styles.indices && name == styles[selectedStyle].name && gains.contentEquals(styles[selectedStyle].gains) -> styleEntries[selectedStyle].key
+        else -> null
+    }
+    val isFavorite = draftKey != null && draftKey in favorites
+    val favoritePresets = orderedEqPresets(eqLibraryPresets(presets, styleEntries), favorites, onlyFavorites = true)
 
     Text("十段均衡器 · 手机端处理", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontSize = 14.sp, color = muted)
-    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = Color.White) {
-        SuperDropdown(title = "风格文件库", summary = "9种风格参考，非锆势测量校正", items = styles.map { it.name } + "请选择风格",
+    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = MiuixTheme.colorScheme.surface) {
+        if (favoritePresets.isEmpty()) {
+            Text("收藏的 EQ", Modifier.padding(start = 20.dp, top = 18.dp), fontSize = 17.sp)
+            Text("载入或调好曲线后，点击下方星标收藏；收藏会在通知面板置顶。",
+                Modifier.padding(20.dp), fontSize = 13.sp, color = muted)
+        } else {
+            val favoriteIndex = favoritePresets.indexOfFirst { it.key == draftKey }
+            AdaptiveDropdown(title = "收藏的 EQ", summary = "载入编辑区后可继续调整，不自动应用",
+                items = favoritePresets.map { "★ ${it.name}" } + "请选择收藏",
+                selectedIndex = if (favoriteIndex >= 0) favoriteIndex else favoritePresets.size,
+                onSelectedIndexChange = { index ->
+                    favoritePresets.getOrNull(index)?.let { preset ->
+                        selectedId = preset.localId.orEmpty(); selectedStyle = preset.styleIndex
+                        gains = preset.gains.toIntArray()
+                        fileReference = if (preset.styleIndex in styles.indices) styles[preset.styleIndex] else null
+                        name = fileReference?.name ?: preset.name
+                        deletePending = false; feedback = "已载入收藏，尚未应用到手机 EQ"
+                    }
+                })
+        }
+    }
+    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = MiuixTheme.colorScheme.surface) {
+        AdaptiveDropdown(title = "风格文件库", summary = "9种风格参考，非锆势测量校正",
+            items = styles.mapIndexed { index, curve -> (if (styleEntries[index].key in favorites) "★ " else "") + curve.name } + "请选择风格",
             selectedIndex = if (selectedStyle in styles.indices) selectedStyle else styles.size,
             onSelectedIndexChange = { index ->
                 if (index in styles.indices) {
@@ -90,22 +121,22 @@ internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: (
         if (importHint.isNotEmpty()) Text(importHint, Modifier.padding(20.dp), color = accent, fontSize = 13.sp)
     }
     imported?.let { curve ->
-        Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = Color.White) {
+        Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = MiuixTheme.colorScheme.surface) {
             Text("文件预览：${curve.name}", Modifier.padding(20.dp), fontSize = 17.sp, fontWeight = FontWeight.Medium)
             Text("文件声明来源：${curve.source}\n十段增益：${curve.gains.joinToString(" / ")} dB\n${curve.note}",
                 Modifier.padding(horizontal = 20.dp, vertical = 8.dp), fontSize = 13.sp, color = muted)
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(text = "载入编辑区", modifier = Modifier.weight(1f), onClick = {
+            AdaptiveActions(Modifier.fillMaxWidth().padding(16.dp)) { actionModifier ->
+                Button(text = "载入编辑区", modifier = actionModifier, onClick = {
                     gains = curve.gains.clone(); name = curve.name; selectedId = ""; selectedStyle = -1
                     fileReference = curve; deletePending = false; feedback = "文件曲线已载入，尚未保存或应用"; consumeImport()
                 })
-                Button(text = "取消", modifier = Modifier.weight(1f), onClick = consumeImport)
+                Button(text = "取消", modifier = actionModifier, onClick = consumeImport)
             }
         }
     }
-    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = Color.White) {
-        val choices = presets.map { it.name } + "新建预设"
-        SuperDropdown(title = "本地音效预设", items = choices, selectedIndex = if (selected >= 0) selected else choices.lastIndex,
+    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = MiuixTheme.colorScheme.surface) {
+        val choices = presets.map { (if ("local:${it.id}" in favorites) "★ " else "") + it.name } + "新建预设"
+        AdaptiveDropdown(title = "本地音效预设", items = choices, selectedIndex = if (selected >= 0) selected else choices.lastIndex,
             onSelectedIndexChange = { index ->
                 selectedStyle = -1; fileReference = null
                 if (index in presets.indices) {
@@ -117,46 +148,64 @@ internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: (
             }, alwaysRight = true, insideMargin = DpSize(20.dp, 20.dp))
         Text("音效名称", Modifier.padding(start = 20.dp, top = 4.dp), fontSize = 15.sp)
         BasicTextField(value = name, onValueChange = { name = it.take(40); deletePending = false }, singleLine = true,
-            textStyle = TextStyle(color = Color(0xff252525), fontSize = 17.sp),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(accent),
+            textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 17.sp),
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).fillMaxWidth()
-                .background(Color(0xfff3f4f5), RoundedCornerShape(16.dp)).padding(16.dp)
+                .background(MiuixTheme.colorScheme.surfaceContainer, RoundedCornerShape(16.dp)).padding(16.dp)
                 .semantics { contentDescription = "音效名称，最多40个字" })
+        Button(text = when { isFavorite -> "★ 取消收藏"; draftKey != null -> "☆ 收藏这条 EQ"; else -> "☆ 保存并收藏当前曲线" },
+            enabled = name.isNotBlank() && (draftKey != null || selected >= 0 || presets.size < 20),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), onClick = {
+                if (draftKey != null) {
+                    if (store.setFavorite(draftKey, !isFavorite)) feedback = if (isFavorite) "已取消收藏，预设仍保留" else "已收藏，通知面板会优先显示"
+                    else feedback = "收藏保存失败，请重试"
+                } else {
+                    val preset = EqPreset(if (selected >= 0) selectedId else UUID.randomUUID().toString(), name.trim(), gains.toList())
+                    val next = if (selected >= 0) presets.toMutableList().also { it[selected] = preset } else presets + preset
+                    if (store.save(next, store.favorites() + "local:${preset.id}")) {
+                        presets = next; selectedId = preset.id; selectedStyle = -1; name = preset.name
+                        feedback = "曲线已保存并收藏，尚未应用到手机 EQ"
+                    } else feedback = "保存及收藏失败，请重试"
+                }
+            })
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("均衡器", Modifier.weight(1f), color = muted, fontSize = 14.sp)
             Button(text = "重置", onClick = { gains = IntArray(10); selectedStyle = -1; fileReference = null; feedback = "曲线已归零，尚未应用" })
         }
         BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-            val chartWidth = maxOf(maxWidth, 300.dp)
+            val scale = LocalDensity.current.fontScale
+            val chartWidth = AdaptiveLayoutPolicy.eqWidth(maxWidth.value, scale).dp
+            val trackHeight = if (LocalAdaptiveViewport.current.height < 480.dp) 160.dp else 240.dp
             Row(Modifier.horizontalScroll(rememberScrollState())) {
                 Row(Modifier.width(chartWidth).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.width(20.dp).height(298.dp).padding(top = 26.dp, bottom = 24.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.width(24.dp).height(trackHeight + (40 * scale).dp).padding(top = 20.dp, bottom = 20.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         for (label in listOf("+6", "0", "−6")) Text(label, fontSize = 10.sp, color = muted)
                     }
                     for (index in gains.indices) {
                         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             val gain = gains[index]
                             Text(if (gain > 0) "+$gain" else "$gain", fontSize = 11.sp, color = muted)
-                            EqBand(CustomEqProtocol.FREQUENCIES[index], gain, accent, Modifier.fillMaxWidth().height(260.dp)) { value ->
+                            EqBand(CustomEqProtocol.FREQUENCIES[index], gain, accent, Modifier.fillMaxWidth().height(trackHeight)) { value ->
                                 gains = gains.clone().also { it[index] = value }
                                 feedback = "曲线已编辑，点击下方应用到手机 EQ"
                             }
-                            Text(CustomEqProtocol.FREQUENCIES[index], fontSize = 11.sp, color = Color(0xff333333))
+                            Text(CustomEqProtocol.FREQUENCIES[index], fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurface)
                         }
                     }
                 }
             }
         }
-        Text("频率 Hz · 增益 dB · 1 dB 步进", Modifier.padding(start = 20.dp, top = 6.dp, bottom = 16.dp), color = muted, fontSize = 12.sp)
-        Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("频率 Hz · 增益 dB · 1 dB 步进 · 窄窗口可左右滑动频段", Modifier.padding(start = 20.dp, top = 6.dp, bottom = 16.dp), color = muted, fontSize = 12.sp)
+        AdaptiveActions(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) { actionModifier ->
             Button(text = if (selected >= 0) "保存修改" else "保存到手机", enabled = name.isNotBlank() && (selected >= 0 || presets.size < 20),
-                modifier = Modifier.weight(1f), onClick = {
+                modifier = actionModifier, onClick = {
                     val preset = EqPreset(if (selected >= 0) selectedId else UUID.randomUUID().toString(), name.trim(), gains.toList())
                     val next = if (selected >= 0) presets.toMutableList().also { it[selected] = preset } else presets + preset
                     if (store.save(next)) { presets = next; selectedId = preset.id; name = preset.name; feedback = "预设已保存；当前音效是否启用请看下方手机 EQ 状态" }
                     else feedback = "本地保存失败，请重试"
                 })
             Button(text = if (deletePending) "确认删除" else "删除", enabled = selected >= 0,
-                modifier = Modifier.weight(1f), onClick = {
+                modifier = actionModifier, onClick = {
                     if (!deletePending) { deletePending = true; feedback = "再次点击确认删除该手机预设" }
                     else {
                         val next = presets.filterNot { it.id == selectedId }
@@ -167,11 +216,11 @@ internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: (
         }
         Text(if (dirty) "当前编辑尚未保存到手机" else "手机预设已保存", Modifier.padding(20.dp), color = muted, fontSize = 12.sp)
     }
-    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = Color.White) {
+    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = MiuixTheme.colorScheme.surface) {
         SuperSwitch(title = "手机端 EQ", summary = "处理本机音频，参数保存在手机",
             checked = phone.enabled, enabled = phone.loaded && Build.VERSION.SDK_INT >= 28, insideMargin = DpSize(20.dp, 20.dp),
             onCheckedChange = { if (it) enablePhone(gains.clone(), globalMode) else disablePhone() })
-        SuperDropdown(title = "接入方式", items = listOf("播放器会话", "全局兼容（实验）"), selectedIndex = if (globalMode) 1 else 0,
+        AdaptiveDropdown(title = "接入方式", items = listOf("播放器会话", "全局兼容（实验）"), selectedIndex = if (globalMode) 1 else 0,
             onSelectedIndexChange = { globalMode = it == 1; feedback = "接入方式已选择，点击应用后使用" },
             alwaysRight = true, insideMargin = DpSize(20.dp, 20.dp))
         Text(phone.status, Modifier.padding(horizontal = 20.dp, vertical = 8.dp), color = accent, fontSize = 14.sp)
@@ -181,42 +230,14 @@ internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: (
         Button(text = if (phone.enabled) "应用本页曲线到手机 EQ" else "应用曲线并启用手机 EQ",
             enabled = phone.loaded && Build.VERSION.SDK_INT >= 28,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), onClick = { enablePhone(gains.clone(), globalMode) })
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(text = "重建音效", enabled = phone.enabled, modifier = Modifier.weight(1f), onClick = retryPhone)
-            Button(text = "复制手机 EQ 诊断", modifier = Modifier.weight(1f), onClick = copyPhoneDiagnostics)
+        AdaptiveActions(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { actionModifier ->
+            Button(text = "重建音效", enabled = phone.enabled, modifier = actionModifier, onClick = retryPhone)
+            Button(text = "复制手机 EQ 诊断", modifier = actionModifier, onClick = copyPhoneDiagnostics)
         }
         Text("先连接耳机再播放音乐。会话模式需要播放器公开音频会话，可重新开始播放或在播放器内选择系统均衡器。全局兼容可能被系统或播放器绕过；请试听对比，建议先关闭其他均衡器。检测不到耳机输出时暂停处理。",
             Modifier.padding(20.dp), color = muted, fontSize = 12.sp)
         Text("引擎部分移植自 GPL-3.0 开源项目 Equalizer314。Android 9+ 可用；本功能不向耳机写入 EQ。",
             Modifier.padding(start = 20.dp, end = 20.dp, bottom = 20.dp), color = muted, fontSize = 12.sp)
-    }
-    Button(text = if (showHardware) "收起耳机内置 EQ 诊断" else "耳机内置 EQ（实验诊断）",
-        onClick = { showHardware = !showHardware }, modifier = Modifier.padding(horizontal = 12.dp))
-    if (showHardware) {
-    Card(Modifier.fillMaxWidth(), cornerRadius = 20.dp, color = Color.White) {
-        Text("耳机 EQ", Modifier.padding(start = 20.dp, top = 20.dp), fontSize = 17.sp, fontWeight = FontWeight.Medium)
-        Text(if (device.connected) device.customEqStatus else "请先连接锆势；离线仍可编辑和保存预设。",
-            Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = muted, fontSize = 13.sp)
-        Text(device.customEqDiagnosticSummary, Modifier.padding(horizontal = 20.dp, vertical = 6.dp), color = muted, fontSize = 12.sp)
-        val actual = device.customEq
-        if (actual != null) {
-            Text("耳机回读：" + actual.joinToString(" / ") { if (it > 0) "+$it" else "$it" } + " dB",
-                Modifier.padding(horizontal = 20.dp, vertical = 6.dp), fontSize = 12.sp, color = muted)
-            Text("当前音效：" + when (device.values["eq"]) { 0 -> "HiFi"; 1 -> "流行"; 2 -> "摇滚"; 4 -> "自定义"; else -> "未读取" },
-                Modifier.padding(horizontal = 20.dp, vertical = 6.dp), fontSize = 13.sp, color = muted)
-        }
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(text = "读取耳机 EQ", enabled = device.connected && !device.customEqBusy, modifier = Modifier.weight(1f), onClick = read)
-            Button(text = "载入回读曲线", enabled = device.connected && actual != null && !device.customEqBusy, modifier = Modifier.weight(1f), onClick = {
-                actual?.let { gains = it.clone(); selectedId = ""; name = "耳机曲线"; feedback = "已载入耳机曲线，可命名后保存到手机" }
-            })
-        }
-        Button(text = "应用到耳机（实验）", enabled = device.connected && actual != null && !device.customEqBusy,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), onClick = { apply(gains.clone()) })
-        Button(text = "复制 EQ 诊断", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), onClick = copyDiagnostics)
-        Text("先读取兼容数据，再写入并回读核对；曲线一致后才切换自定义模式。频点按 i7 参考显示，锆势的实际频点、听感及断电保留情况仍需实测。",
-            Modifier.padding(20.dp), fontSize = 12.sp, color = muted)
-    }
     }
     if (feedback.isNotEmpty()) Text(feedback, Modifier.padding(horizontal = 12.dp), color = accent, fontSize = 13.sp)
 }
@@ -224,6 +245,8 @@ internal fun CustomEqScreen(device: DeviceState, store: CustomEqPresets, read: (
 @Composable
 private fun EqBand(frequency: String, gain: Int, accent: Color, modifier: Modifier, change: (Int) -> Unit) {
     val onChange by rememberUpdatedState(change)
+    val track = MiuixTheme.colorScheme.surfaceContainer
+    val handle = MiuixTheme.colorScheme.surface
     Canvas(modifier.semantics {
         contentDescription = "$frequency Hz，$gain dB"
         progressBarRangeInfo = ProgressBarRangeInfo(gain.toFloat(), -6f..6f, 11)
@@ -247,9 +270,9 @@ private fun EqBand(frequency: String, gain: Int, accent: Color, modifier: Modifi
     }) {
         val top = 12.dp.toPx(); val bottom = size.height - top; val center = size.width / 2
         val y = top + (6 - gain) / 12f * (bottom - top)
-        drawLine(Color(0xffe8e8e8), Offset(center, top), Offset(center, bottom), 4.dp.toPx(), StrokeCap.Round)
+        drawLine(track, Offset(center, top), Offset(center, bottom), 4.dp.toPx(), StrokeCap.Round)
         drawLine(accent, Offset(center, y), Offset(center, bottom), 4.dp.toPx(), StrokeCap.Round)
-        drawCircle(Color.White, 8.dp.toPx(), Offset(center, y))
+        drawCircle(handle, 8.dp.toPx(), Offset(center, y))
         drawCircle(accent, 8.dp.toPx(), Offset(center, y), style = Stroke(2.5.dp.toPx()))
     }
 }

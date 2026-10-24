@@ -5,6 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -31,6 +33,8 @@ public final class EarphoneService extends Service implements BluetoothControlle
     private List<BluetoothController.DeviceRecord> devices = new ArrayList<>();
     private DeviceState state = new DeviceState();
     private BluetoothController controller;
+    private PhoneEqEngine phoneEq;
+    private boolean eqWasEnabled;
     private NoiseNotification notification;
     private LiveConnectionNotification liveConnection;
     private android.content.SharedPreferences appearance;
@@ -65,15 +69,27 @@ public final class EarphoneService extends Service implements BluetoothControlle
         channel.enableVibration(false);
         getSystemService(NotificationManager.class).createNotificationChannel(channel);
         notification = new NoiseNotification(this);
+        getSystemService(NotificationManager.class).cancel(79); // Remove the old separate EQ card on upgrade.
         liveConnection = new LiveConnectionNotification(this, this::onLog);
         controller = new BluetoothController(this, this);
         appearance = getSharedPreferences("appearance", MODE_PRIVATE);
         appearance.registerOnSharedPreferenceChangeListener(appearanceListener);
+        phoneEq = new PhoneEqEngine(this, this::onPhoneEqChanged);
     }
     @Override public IBinder onBind(Intent intent) { return binder; }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
-        if (ACTION_CONNECT.equals(action)) {
+        if (PhoneEqEngine.ENABLE.equals(action)) {
+            try {
+                enterForeground(true);
+                phoneEq.enable(intent.getIntArrayExtra(PhoneEqEngine.GAINS), intent.getBooleanExtra(PhoneEqEngine.GLOBAL, false));
+            } catch (RuntimeException error) {
+                phoneEq.fail("无法启用手机 EQ：" + error.getClass().getSimpleName());
+            }
+            finishIfDisconnected();
+        } else if (PhoneEqEngine.STOP.equals(action)) {
+            phoneEq.disable();
+        } else if (ACTION_CONNECT.equals(action)) {
             String address = intent.getStringExtra(EXTRA_ADDRESS);
             boolean automatic = intent.getBooleanExtra(EXTRA_AUTOMATIC, false);
             // Duplicate ACL/A2DP events must never replace an established or in-flight session.
@@ -87,8 +103,7 @@ public final class EarphoneService extends Service implements BluetoothControlle
                 state.connecting = true;
                 state.status = "正在连接…";
                 modes.report(false, null);
-                startForeground(NOTIFICATION_ID, buildNotification());
-                foreground = true;
+                enterForeground(phoneEq.isEnabled());
                 // Recheck settings after dispatch, including cancellation while Android starts us.
                 if (automatic && !AutoConnection.eligible(this, address)) {
                     controller.disconnect();
@@ -128,6 +143,22 @@ public final class EarphoneService extends Service implements BluetoothControlle
         for (String line : new ArrayList<>(logs)) listener.onLog(line);
     }
     void removeListener(BluetoothController.Listener listener) { listeners.remove(listener); }
+    PhoneEqEngine phoneEq() { return phoneEq; }
+    private void enterForeground(boolean withEq) {
+        if (Build.VERSION.SDK_INT >= 34) {
+            int type = withEq ? ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE : 0;
+            if (state.connected || state.connecting || launchingConnection) type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE;
+            startForeground(NOTIFICATION_ID, buildNotification(), type);
+        } else startForeground(NOTIFICATION_ID, buildNotification());
+        foreground = true;
+    }
+    private void onPhoneEqChanged() {
+        if (destroying) return;
+        boolean enabled = phoneEq.isEnabled();
+        if (enabled == eqWasEnabled) return; // Parameter/status changes do not redraw the headphone card.
+        eqWasEnabled = enabled;
+        if (enabled) scheduleNotification(); else finishIfDisconnected();
+    }
     void scan() { controller.scan(); }
     void refresh() { controller.refresh(); }
     void disconnect() {
@@ -205,6 +236,11 @@ public final class EarphoneService extends Service implements BluetoothControlle
     }
     private void finishIfDisconnected() {
         if (launchingConnection || state.connected || state.connecting) return;
+        if (phoneEq != null && phoneEq.isEnabled()) {
+            if (liveConnection != null) liveConnection.cancel();
+            scheduleNotification();
+            return;
+        }
         main.removeCallbacks(updateNotification);
         notificationScheduled = false;
         main.removeCallbacks(expireRequest);
@@ -220,6 +256,7 @@ public final class EarphoneService extends Service implements BluetoothControlle
         listeners.clear();
         if (liveConnection != null) liveConnection.close();
         if (controller != null) controller.close();
+        if (phoneEq != null) phoneEq.close();
         if (foreground) stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }

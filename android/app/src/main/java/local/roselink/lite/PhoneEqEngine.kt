@@ -5,14 +5,14 @@ package local.roselink.lite
 
 import android.app.*
 import android.content.*
-import android.content.pm.ServiceInfo
 import android.media.*
 import android.media.audiofx.AudioEffect
 import android.os.*
 import org.json.JSONArray
 
-/** User-started software FX service, independent of the Bluetooth control socket. */
-class PhoneEqService : Service() {
+/** Audio effects live inside EarphoneService and share its single foreground notification. */
+class PhoneEqEngine(private val context: Context, private val host: Host) {
+    fun interface Host { fun onEqChanged() }
     private val state = PhoneEqState()
     private val listeners = mutableSetOf<(PhoneEqState) -> Unit>()
     private val sessions = linkedMapOf<Int, String>()
@@ -20,11 +20,10 @@ class PhoneEqService : Service() {
     private val history = ArrayDeque<String>()
     private val main = Handler(Looper.getMainLooper())
     private lateinit var audio: AudioManager
-    private var foreground = false
     private var stopping = false
-    private val preferences by lazy { getSharedPreferences("phone_eq", MODE_PRIVATE) }
-    inner class LocalBinder : Binder() { val service get() = this@PhoneEqService }
-    override fun onBind(intent: Intent?) = LocalBinder()
+    private val preferences by lazy { context.getSharedPreferences("phone_eq", Context.MODE_PRIVATE) }
+    fun isEnabled() = state.enabled
+    fun snapshot(): PhoneEqState = state.copy()
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val id = intent.getIntExtra(AudioEffect.EXTRA_AUDIO_SESSION, -1)
@@ -49,43 +48,35 @@ class PhoneEqService : Service() {
     private val monitor = object : Runnable {
         override fun run() { if (state.enabled && !stopping) { publish(); main.postDelayed(this, 2000) } }
     }
-    override fun onCreate() {
-        super.onCreate()
-        audio = getSystemService(AudioManager::class.java)
+    init {
+        audio = context.getSystemService(AudioManager::class.java)
         state.global = preferences.getBoolean("global", false)
         state.gains = try {
             val array = JSONArray(preferences.getString("gains", "[]"))
             IntArray(array.length()) { array.getInt(it) }.takeIf { CustomEqProtocol.valid(it) } ?: IntArray(10)
         } catch (_: Exception) { IntArray(10) }
         state.loaded = true
-        val channel = NotificationChannel(CHANNEL, "手机端 EQ", NotificationManager.IMPORTANCE_LOW)
-        channel.setSound(null, null); channel.setShowBadge(false)
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         val filter = IntentFilter(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION).apply {
             addAction(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION)
         }
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
+        if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED) else context.registerReceiver(receiver, filter)
         audio.registerAudioDeviceCallback(deviceCallback, main)
     }
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == STOP) { disable(); return START_NOT_STICKY }
-        if (intent?.action != ENABLE) { stopSelf(); return START_NOT_STICKY }
-        if (Build.VERSION.SDK_INT < 28) { state.status = "手机端 EQ 需要 Android 9 及以上"; publish(); stopSelf(); return START_NOT_STICKY }
+    fun enable(gains: IntArray?, global: Boolean) {
+        if (Build.VERSION.SDK_INT < 28) { fail("手机端 EQ 需要 Android 9 及以上"); return }
         try {
-            if (Build.VERSION.SDK_INT >= 34) startForeground(ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            else startForeground(ID, notification())
-            foreground = true
-            val gains = intent.getIntArrayExtra(GAINS)
             require(CustomEqProtocol.valid(gains)) { "曲线必须是十段−6～+6dB增益" }
-            state.gains = gains!!.clone(); state.global = intent.getBooleanExtra(GLOBAL, false); state.enabled = true
+            state.gains = gains!!.clone(); state.global = global; state.enabled = true
             preferences.edit().putString("gains", JSONArray(gains.toList()).toString()).putBoolean("global", state.global).apply()
             note("启用：${if (state.global) "全局兼容" else "播放器会话"}；自动余量 ${PhoneEqCurve.headroom(gains)}dB")
             rebuild(); main.removeCallbacks(monitor); main.postDelayed(monitor, 2000)
         } catch (error: Exception) {
-            state.enabled = false; state.status = "手机 EQ 启动失败：${error.message}"
-            note(state.status); releaseEffects(); publish(); stopForeground(STOP_FOREGROUND_REMOVE); foreground = false; stopSelf()
+            fail("手机 EQ 启动失败：${error.message}")
         }
-        return START_NOT_STICKY
+    }
+    fun fail(message: String) {
+        state.enabled = false; main.removeCallbacks(monitor); releaseEffects()
+        state.status = message; note(message); publish()
     }
     fun addListener(listener: (PhoneEqState) -> Unit) { listeners.add(listener); listener(state.copy()) }
     fun removeListener(listener: (PhoneEqState) -> Unit) { listeners.remove(listener) }
@@ -101,8 +92,6 @@ class PhoneEqService : Service() {
     fun disable() {
         state.enabled = false; main.removeCallbacks(monitor); releaseEffects()
         state.status = "手机端 EQ 已停用"; note("用户停用并释放音效"); publish()
-        if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
-        foreground = false; stopSelf()
     }
     private fun attach(id: Int) {
         effects.remove(id)?.release()
@@ -140,28 +129,18 @@ class PhoneEqService : Service() {
             + "曲线：${state.gains.joinToString()}；输入余量：${PhoneEqCurve.headroom(state.gains)}dB\n"
             + "当前：${state.status}\n" + history.joinToString("\n"))
         listeners.toList().forEach { it(state.copy()) }
-        if (foreground) getSystemService(NotificationManager::class.java).notify(ID, notification())
+        host.onEqChanged()
     }
     private fun note(message: String) { history.addLast(message); while (history.size > 24) history.removeFirst() }
     private fun releaseEffects() { effects.values.forEach { it.release() }; effects.clear() }
-    private fun notification(): Notification {
-        val open = PendingIntent.getActivity(this, 101, Intent(this, MainActivity::class.java).setAction(OPEN), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val stop = PendingIntent.getService(this, 102, Intent(this, PhoneEqService::class.java).setAction(STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        return Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_headphones).setContentTitle("ZirconPods · 手机端 EQ")
-            .setContentText(state.status).setContentIntent(open).setOnlyAlertOnce(true).setOngoing(true)
-            .addAction(Notification.Action.Builder(null, "停用 EQ", stop).build()).build()
-    }
-    override fun onDestroy() {
-        stopping = true; main.removeCallbacksAndMessages(null); releaseEffects(); listeners.clear()
-        unregisterReceiver(receiver); audio.unregisterAudioDeviceCallback(deviceCallback)
-        if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
-        super.onDestroy()
+    fun close() {
+        stopping = true; state.enabled = false; main.removeCallbacksAndMessages(null); releaseEffects(); listeners.clear()
+        context.unregisterReceiver(receiver); audio.unregisterAudioDeviceCallback(deviceCallback)
     }
     companion object {
         const val ENABLE = "local.roselink.lite.PHONE_EQ_ENABLE"
         const val STOP = "local.roselink.lite.PHONE_EQ_STOP"
         const val OPEN = "local.roselink.lite.PHONE_EQ_OPEN"
         const val GAINS = "gains"; const val GLOBAL = "global"
-        private const val CHANNEL = "phone_equalizer"; private const val ID = 79
     }
 }

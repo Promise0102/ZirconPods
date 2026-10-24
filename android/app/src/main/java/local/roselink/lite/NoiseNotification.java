@@ -85,7 +85,10 @@ final class NoiseNotification {
         String status = state.connecting ? "正在连接耳机…" : "当前：" + NoiseModeSelection.label(modes.confirmed());
         if (state.connected && modes.requested() != NoiseModeSelection.UNKNOWN)
             status += " · 正在切换" + NoiseModeSelection.label(modes.requested());
+        if (!state.connected && !state.connecting) status = "控制通道未连接 · 点击切换声音模式打开面板";
         expanded.setTextViewText(R.id.notification_status, status);
+        compact.setBoolean(R.id.notification_disconnect, "setEnabled", state.connected || state.connecting);
+        compact.setFloat(R.id.notification_disconnect, "setAlpha", state.connected || state.connecting ? 1f : .45f);
         return new Notification.Builder(context, EarphoneService.CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification).setContentTitle(title)
                 .setContentText(EarphoneCardContent.batteryLine(state)).setContentIntent(open)
