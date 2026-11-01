@@ -1,22 +1,22 @@
 # ZirconPods
 
-![Version](https://img.shields.io/badge/version-0.14.0--test-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+![Version](https://img.shields.io/badge/version-0.14.0-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
-为弱水时砂锆势（ROSE Zircon）耳机提供简洁的 Android 本地蓝牙控制，用于缓解官方应用连接异常带来的控制困难。最新公开测试版为 **0.14.0 EQ 收藏与折叠屏适配**，稳定版保留 **0.8.1**。应用支持 Android 8.0 及以上，手机端 EQ 需要 Android 9 及以上。
+为弱水时砂锆势（ROSE Zircon）耳机提供简洁的 Android 本地蓝牙控制，用于缓解官方应用连接异常带来的控制困难。最新正式版为 **0.14.0 EQ 收藏与折叠屏适配**，于2026-11-01由预发布转为正式发布。应用支持 Android 8.0 及以上，手机端 EQ 需要 Android 9 及以上。
 
-[下载 0.14.0 测试版与 EQ 文件](https://github.com/Promise0102/ZirconPods/releases/tag/v0.14.0) · [0.8.1 稳定版](https://github.com/Promise0102/ZirconPods/releases/tag/v0.8.1) · [更新日志](CHANGELOG.md) · [Android 项目与构建](android/README.md)
+[下载 0.14.0 正式版与 EQ 文件](https://github.com/Promise0102/ZirconPods/releases/tag/v0.14.0) · [0.8.1 历史版本](https://github.com/Promise0102/ZirconPods/releases/tag/v0.8.1) · [更新日志](CHANGELOG.md) · [Android 项目与构建](android/README.md)
 
-## 0.14.0 EQ 收藏（公开测试）
+## 0.14.0 EQ 收藏
 
-自定义EQ可收藏本地预设、风格曲线及导入后编辑的曲线，通知面板收藏置顶并支持“仅显示收藏”。收藏本身不启用音效，旧预设继续保留。2026-10-24公开发布，包含此前未单独发布的0.12～0.14改动，使用和验证范围见 [EQ收藏说明](android/EQ收藏说明.md)。
+自定义EQ可收藏本地预设、风格曲线及导入后编辑的曲线，通知面板收藏置顶并支持“仅显示收藏”。收藏本身不启用音效，旧预设继续保留。2026-10-24首次公开，2026-11-01转为正式版，包含此前未单独发布的0.12～0.14改动，使用和验证范围见 [EQ收藏说明](android/EQ收藏说明.md)。
 
 ### 0.13.0 折叠屏与窗口适配
 
-根据实际窗口和字体大小调整布局，宽窗口支持主页双栏；接入WindowManager避让系统报告的分隔铰链，保存当前页面和EQ草稿。EQ滑杆、通知面板与配对列表支持窄/矮窗口滚动和按钮重排。已包含在0.14.0公开测试版中，实机验证范围见 [折叠屏适配说明](android/折叠屏适配说明.md)。
+根据实际窗口和字体大小调整布局，宽窗口支持主页双栏；接入WindowManager避让系统报告的分隔铰链，保存当前页面和EQ草稿。EQ滑杆、通知面板与配对列表支持窄/矮窗口滚动和按钮重排。已包含在0.14.0正式版中，实机验证范围见 [折叠屏适配说明](android/折叠屏适配说明.md)。
 
 ### 0.12.x 通知与外观
 
-移除耳机内置EQ实验诊断入口，保留手机EQ、风格文件和本地预设；耳机与音效共用一张前台通知，不再显示独立EQ卡片。通知“切换声音模式”面板可直接选择EQ预设或停用音效，设置中新增跟随系统/浅色/暗色外观。0.12.1补上通知弹窗漏接的Miuix菜单显示容器，修复点按EQ预设没有选项的问题。已包含在0.14.0公开测试版中，验证范围见 [通知预设与暗色模式说明](android/通知预设与暗色模式说明.md)。
+移除耳机内置EQ实验诊断入口，保留手机EQ、风格文件和本地预设；耳机与音效共用一张前台通知，不再显示独立EQ卡片。通知“切换声音模式”面板可直接选择EQ预设或停用音效，设置中新增跟随系统/浅色/暗色外观。0.12.1补上通知弹窗漏接的Miuix菜单显示容器，修复点按EQ预设没有选项的问题。已包含在0.14.0正式版中，验证范围见 [通知预设与暗色模式说明](android/通知预设与暗色模式说明.md)。
 
 ## 0.11.0 风格文件与导入（公开测试）
 
@@ -53,7 +53,7 @@
 
 ## 安装与使用
 
-1. 从 [v0.14.0 测试版 Release](https://github.com/Promise0102/ZirconPods/releases/tag/v0.14.0) 下载签名 APK，使用相同包名与原发布签名，可覆盖更新此前版本；需要旧稳定版可选择 [v0.8.1](https://github.com/Promise0102/ZirconPods/releases/tag/v0.8.1)。
+1. 从 [v0.14.0 正式版 Release](https://github.com/Promise0102/ZirconPods/releases/tag/v0.14.0) 下载签名 APK，使用相同包名与原发布签名，可覆盖更新此前版本；需要旧版可选择 [v0.8.1](https://github.com/Promise0102/ZirconPods/releases/tag/v0.8.1)。
 2. 手机系统蓝牙先配对耳机；打开应用，允许附近设备和通知权限。
 3. 点击左上角设备面板，扫描并手动连接成功一次；此后可使用自动连接。
 4. 在设置中选择“添加耳机模式磁贴”，或下拉控制中心、点击铅笔后添加“耳机模式”。
